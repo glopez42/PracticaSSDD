@@ -2,6 +2,8 @@
 #include "zerocopyMQ.h"
 #include "comun.h"
 
+int conexion = 0;
+
 int createMQ(const char *cola) {
     return 0;
 }
@@ -13,4 +15,9 @@ int put(const char *cola, const void *mensaje, uint32_t tam) {
 }
 int get(const char *cola, void **mensaje, uint32_t *tam, bool blocking) {
     return 0;
+}
+
+
+int conectar(){
+    
 }

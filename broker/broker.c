@@ -8,7 +8,8 @@
 #include "diccionario.h"
 #include "cola.h"
 
-#define TAM 4294967296
+/*7B de cabecera + 2^32 de mensaje + 2^16 de nombre de cola ???*/
+#define TAM 1024
 
 int main(int argc, char *argv[])
 {
@@ -74,6 +75,11 @@ int main(int argc, char *argv[])
                     close(s_conec);
                     exit(1);
                 }
+
+                printf("soy el broker: %s\n", buf);
+
+
+                
             }
             if (leido < 0)
             {

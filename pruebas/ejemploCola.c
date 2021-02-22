@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "cola.h"
 
 
@@ -33,6 +34,7 @@ int main(){
     
     int iter;
     struct cola *cola;
+    char hola[5];
     cola = cola_create();
     printf("Introduce nº de personas: ");
     scanf("%d", &iter);
@@ -42,5 +44,10 @@ int main(){
     }
 
     cola_visit(cola, imprime_persona);
+
+    hola[0]='c';
+    hola[1]='\0';
+
+    printf("%ld\n", strlen(hola));
 
 }

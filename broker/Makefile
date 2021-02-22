@@ -1,3 +1,5 @@
+CC=c99
+
 CFLAGS=-Wall -g
 
 all: broker demo_dic demo_cola

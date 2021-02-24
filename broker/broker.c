@@ -1,23 +1,32 @@
 #include <stdio.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <string.h>
 #include "comun.h"
 #include "diccionario.h"
 #include "cola.h"
 
-/*7B de cabecera + 2^32 de mensaje + 2^16 de nombre de cola ???*/
 #define TAM 1024
+
+void imprimeDic(char *c, void *v)
+{
+    printf("nombre %s\n", c);
+}
+
 
 int main(int argc, char *argv[])
 {
-
-    int s, s_conec, leido;
+    struct diccionario *dicColas;
+    struct cola *cola;
+    struct iovec respuesta[1];
+    int i, s, s_conec, leido;
     unsigned int tam_dir;
     struct sockaddr_in dir, dir_cliente;
-    char buf[TAM];
+    char buf[TAM], operacion, *colaName, *mensajeRespuesta;
     int opcion = 1;
 
     if (argc != 2)
@@ -55,6 +64,10 @@ int main(int argc, char *argv[])
         close(s);
         return 1;
     }
+
+    /*Creamos el diccionario que guardará las colas*/
+    dicColas = dic_create();
+
     while (1)
     {
         tam_dir = sizeof(dir_cliente);
@@ -69,17 +82,67 @@ int main(int argc, char *argv[])
             close(s);
             while ((leido = read(s_conec, buf, TAM)) > 0)
             {
-                if (write(s_conec, buf, leido) < 0)
+                
+                /*obtenemos la primera letra, que tiene la operacion a realizar*/
+                operacion = buf[0];
+
+                switch (operacion)
+                {
+                /*Crear cola*/
+                case 'C':
+                    /*el mensaje contiene una letra y el nombre de la cola*/
+                    colaName = malloc(strlen(buf) - 1);
+                    
+                    for (i = 0; i < strlen(buf) -1; i++)
+                        {
+                            colaName[i] = buf[i+1];
+                        }
+                    printf("leido %ld %s\n",strlen(buf), colaName);
+                    /*Si la cola existe, manda una respuesta con una sola E (error)*/
+                    if (dic_get(dicColas, colaName, NULL) == NULL)
+                    {
+                        mensajeRespuesta = malloc(sizeof(char));
+                        mensajeRespuesta = "E";
+                    }
+                    else
+                    {
+                        /*Si no, la crea y manda una B (bien)*/
+                        cola = cola_create();
+                        dic_put(dicColas, colaName, NULL);
+                        mensajeRespuesta = malloc(sizeof(char));
+                        mensajeRespuesta = "B";
+                    }
+                    free(colaName);
+                    break;
+
+                /*Destruir cola*/
+                case 'D':
+                    break;
+
+                /*Poner un mensaje*/
+                case 'P':
+                    break;
+
+                /*Obtener un mensaje*/
+                case 'G':
+                    break;
+
+                default:
+                    break;
+                }  
+
+                
+                respuesta[0].iov_base = mensajeRespuesta;
+                respuesta[0].iov_len = strlen(mensajeRespuesta);
+
+                if (writev(s_conec, respuesta, 1) < 0)
                 {
                     perror("error en write");
                     close(s_conec);
                     exit(1);
                 }
+                dic_visit(dicColas, imprimeDic);
 
-                printf("soy el broker: %s\n", buf);
-
-
-                
             }
             if (leido < 0)
             {

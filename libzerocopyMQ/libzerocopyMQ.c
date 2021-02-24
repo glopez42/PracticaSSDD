@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <stdio.h>
@@ -48,6 +49,7 @@ int createMQ(const char *cola)
     int nameLength, leido;
     char *mensaje;
     char operacion[2];
+    struct iovec envio[1];
 
     /*letra C para crear una cola*/
     operacion[0] = 'C';
@@ -70,8 +72,11 @@ int createMQ(const char *cola)
     strcat(mensaje, cola);
     leido = strlen(mensaje);
 
+    envio[0].iov_base = mensaje;
+    envio[0].iov_len = leido;
+
     /*mandamos mensaje*/
-    if (writev(s, mensaje, leido) < 0)
+    if (writev(s, envio, 1) < 0)
     {
         perror("Error al mandar un mensaje desde el cliente");
         close(s);
@@ -97,6 +102,7 @@ int destroyMQ(const char *cola)
     int nameLength, leido;
     char *mensaje;
     char operacion[2];
+    struct iovec envio[1];
 
     /*letra D para destruir una cola*/
     operacion[0] = 'D';
@@ -119,8 +125,11 @@ int destroyMQ(const char *cola)
     strcat(mensaje, cola);
     leido = strlen(mensaje);
 
+    envio[0].iov_base = mensaje;
+    envio[0].iov_len = leido;
+
     /*mandamos mensaje*/
-    if (writev(s, mensaje, leido) < 0)
+    if (writev(s, envio, 1) < 0)
     {
         perror("Error al mandar un mensaje desde el cliente");
         close(s);
@@ -145,6 +154,7 @@ int put(const char *cola, const void *mensaje, uint32_t tam)
     int nameLength, tamLength;
     char * mensajeFinal;
     char operacion[2], tamanyo[8];
+    struct iovec envio[1];
 
     if (conexion == 0)
     {
@@ -164,17 +174,21 @@ int put(const char *cola, const void *mensaje, uint32_t tam)
     sprintf(tamanyo, "%d", tam);
     tamLength = strlen(tamanyo);
     
-    /*para construir el mensaje, se separa cada apartado con una 'X'*/
-    mensajeFinal = malloc(1 + nameLength + 1 + tamLength + 1 + tam);
+    /*en el mensaje, primero irá la letra asociada a la operación
+    después el tamaño del mensaje seguido de un guion, el mensaje
+    y finalmente el nombre de la cola*/
+    mensajeFinal = malloc(1 + tamLength + 1 + tam + nameLength);
     strcpy(mensajeFinal, operacion);
-    strcat(mensajeFinal, cola);
-    strcat(mensajeFinal, "X");
     strcat(mensajeFinal, tamanyo);
-    strcat(mensajeFinal, "X");
+    strcat(mensajeFinal, "-");
     strcat(mensajeFinal, mensaje);
+    strcat(mensajeFinal, cola);
+
+    envio[0].iov_base = mensajeFinal;
+    envio[0].iov_len = strlen(mensajeFinal);
 
     /*mandamos mensaje*/
-    if (writev(s, mensajeFinal, strlen(mensajeFinal)) < 0)
+    if (writev(s, envio, 1) < 0)
     {
         perror("Error al mandar un mensaje desde el cliente");
         close(s);
@@ -201,6 +215,7 @@ int get(const char *cola, void **mensaje, uint32_t *tam, bool blocking)
     int nameLength, leido;
     char *msj;
     char operacion[2];
+    struct iovec envio[1];
 
     /*letra G para obtener un mensaje*/
     operacion[0] = 'D';
@@ -223,8 +238,11 @@ int get(const char *cola, void **mensaje, uint32_t *tam, bool blocking)
     strcat(msj, cola);
     leido = strlen(msj);
 
+    envio[0].iov_base = msj;
+    envio[0].iov_len = leido;
+
     /*mandamos mensaje*/
-    if (writev(s, msj, leido) < 0)
+    if (writev(s, envio, 1) < 0)
     {
         perror("Error al mandar un mensaje desde el cliente");
         close(s);

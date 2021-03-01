@@ -17,16 +17,15 @@ void imprimeDic(char *c, void *v)
     printf("nombre %s\n", c);
 }
 
-
 int main(int argc, char *argv[])
 {
     struct diccionario *dicColas;
     struct cola *cola;
     struct iovec respuesta[1];
-    int i, s, s_conec, leido;
+    int s, s_conec, leido;
     unsigned int tam_dir;
     struct sockaddr_in dir, dir_cliente;
-    char buf[TAM], operacion, *colaName, *mensajeRespuesta;
+    char *buf, operacion, *colaName, *mensajeRespuesta;
     int opcion = 1;
 
     if (argc != 2)
@@ -80,9 +79,10 @@ int main(int argc, char *argv[])
         if (fork() == 0)
         {
             close(s);
-            while ((leido = read(s_conec, buf, TAM)) > 0)
+            buf = malloc(TAM);
+            if ((leido = read(s_conec, buf, TAM)) > 0)
             {
-                
+
                 /*obtenemos la primera letra, que tiene la operacion a realizar*/
                 operacion = buf[0];
 
@@ -90,29 +90,27 @@ int main(int argc, char *argv[])
                 {
                 /*Crear cola*/
                 case 'C':
+
                     /*el mensaje contiene una letra y el nombre de la cola*/
-                    colaName = malloc(strlen(buf) - 1);
-                    
-                    for (i = 0; i < strlen(buf) -1; i++)
-                        {
-                            colaName[i] = buf[i+1];
-                        }
-                    printf("leido %ld %s\n",strlen(buf), colaName);
+                    colaName = &buf[1];
+
+                    printf("leido %ld %s\n", strlen(buf), colaName);
                     /*Si la cola existe, manda una respuesta con una sola E (error)*/
                     if (dic_get(dicColas, colaName, NULL) == NULL)
                     {
-                        mensajeRespuesta = malloc(sizeof(char));
+                        mensajeRespuesta = malloc(sizeof(char) + 1);
                         mensajeRespuesta = "E";
+
                     }
                     else
                     {
                         /*Si no, la crea y manda una B (bien)*/
                         cola = cola_create();
                         dic_put(dicColas, colaName, NULL);
-                        mensajeRespuesta = malloc(sizeof(char));
+                        mensajeRespuesta = malloc(sizeof(char) + 1);
                         mensajeRespuesta = "B";
                     }
-                    free(colaName);
+
                     break;
 
                 /*Destruir cola*/
@@ -129,11 +127,10 @@ int main(int argc, char *argv[])
 
                 default:
                     break;
-                }  
+                }
 
-                
                 respuesta[0].iov_base = mensajeRespuesta;
-                respuesta[0].iov_len = strlen(mensajeRespuesta);
+                respuesta[0].iov_len = strlen(mensajeRespuesta) + 1;
 
                 if (writev(s_conec, respuesta, 1) < 0)
                 {
@@ -141,15 +138,25 @@ int main(int argc, char *argv[])
                     close(s_conec);
                     exit(1);
                 }
-                dic_visit(dicColas, imprimeDic);
-
+                
             }
+            printf("hago free\n");
+            free(buf);
+            printf("hago free\n");
+            buf = NULL;
+
             if (leido < 0)
             {
                 perror("error en read");
                 close(s_conec);
                 exit(1);
             }
+
+            printf("hago free\n");
+            free(mensajeRespuesta);
+            printf("hago free\n");
+            mensajeRespuesta = NULL;
+
             close(s_conec);
             exit(0);
         }

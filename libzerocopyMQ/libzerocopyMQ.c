@@ -61,7 +61,7 @@ int createMQ(const char *cola)
         if (conectar() != 0)
         {
             perror("Error al conectar con el servidor");
-            return 1;
+            return -1;
         }
     }
 
@@ -70,7 +70,7 @@ int createMQ(const char *cola)
     mensaje = malloc(1 + nameLength);
     strcpy(mensaje, operacion);
     strcat(mensaje, cola);
-    leido = strlen(mensaje);
+    leido = strlen(mensaje) + 1;
 
     envio[0].iov_base = mensaje;
     envio[0].iov_len = leido;
@@ -107,7 +107,7 @@ int destroyMQ(const char *cola)
     /*letra D para destruir una cola*/
     operacion[0] = 'D';
     operacion[1] = '\0';
-    nameLength = strlen(cola);
+    nameLength = strlen(cola) + 1;
 
     if (conexion == 0)
     {
@@ -185,7 +185,7 @@ int put(const char *cola, const void *mensaje, uint32_t tam)
     strcat(mensajeFinal, cola);
 
     envio[0].iov_base = mensajeFinal;
-    envio[0].iov_len = strlen(mensajeFinal);
+    envio[0].iov_len = strlen(mensajeFinal) + 1;
 
     /*mandamos mensaje*/
     if (writev(s, envio, 1) < 0)
@@ -236,7 +236,7 @@ int get(const char *cola, void **mensaje, uint32_t *tam, bool blocking)
     msj = malloc(1 + nameLength);
     strcpy(msj, operacion);
     strcat(msj, cola);
-    leido = strlen(msj);
+    leido = strlen(msj) + 1;
 
     envio[0].iov_base = msj;
     envio[0].iov_len = leido;

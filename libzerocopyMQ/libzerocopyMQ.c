@@ -45,7 +45,6 @@ int conectar()
 
 int createMQ(const char *cola)
 {
-
     int nameLength, leido;
     char *mensaje;
     char operacion[2];
@@ -56,13 +55,10 @@ int createMQ(const char *cola)
     operacion[1] = '\0';
     nameLength = strlen(cola);
 
-    if (conexion == 0)
+    if (conectar() != 0)
     {
-        if (conectar() != 0)
-        {
-            perror("Error al conectar con el servidor");
-            return -1;
-        }
+        perror("Error al conectar con el servidor");
+        return 1;
     }
 
     /*mensaje que contiene una letra con el modo de operacion*/
@@ -93,6 +89,7 @@ int createMQ(const char *cola)
     /*TRATAMIENTO DE RESPUESTA*/
 
     free(mensaje);
+    close(s);
     return 0;
 }
 
@@ -109,13 +106,10 @@ int destroyMQ(const char *cola)
     operacion[1] = '\0';
     nameLength = strlen(cola) + 1;
 
-    if (conexion == 0)
+    if (conectar() != 0)
     {
-        if (conectar() != 0)
-        {
-            perror("Error al conectar con el servidor");
-            return 1;
-        }
+        perror("Error al conectar con el servidor");
+        return 1;
     }
 
     /*mensaje que contiene una letra con el modo de operacion*/
@@ -146,25 +140,23 @@ int destroyMQ(const char *cola)
     /*TRATAMIENTO DE RESPUESTA*/
 
     free(mensaje);
+    close(s);    
     return 0;
 }
 
 int put(const char *cola, const void *mensaje, uint32_t tam)
 {
     int nameLength, tamLength;
-    char * mensajeFinal;
+    char *mensajeFinal;
     char operacion[2], tamanyo[8];
     struct iovec envio[1];
 
-    if (conexion == 0)
+    if (conectar() != 0)
     {
-        if (conectar() != 0)
-        {
-            perror("error al conectar con el servidor");
-            return 1;
-        }
+        perror("Error al conectar con el servidor");
+        return 1;
     }
-    
+
     /*Letra P para poner en una cola*/
     operacion[0] = 'P';
     operacion[1] = '\0';
@@ -173,7 +165,7 @@ int put(const char *cola, const void *mensaje, uint32_t tam)
     /*pasamos tam a texto*/
     sprintf(tamanyo, "%d", tam);
     tamLength = strlen(tamanyo);
-    
+
     /*en el mensaje, primero irá la letra asociada a la operación
     después el tamaño del mensaje seguido de un guion, el mensaje
     y finalmente el nombre de la cola*/
@@ -204,8 +196,9 @@ int put(const char *cola, const void *mensaje, uint32_t tam)
     }
 
     /*TRATAMIENTO DE RESPUESTA*/
-    
+
     free(mensajeFinal);
+    close(s);    
     return 0;
 }
 
@@ -222,13 +215,10 @@ int get(const char *cola, void **mensaje, uint32_t *tam, bool blocking)
     operacion[1] = '\0';
     nameLength = strlen(cola);
 
-    if (conexion == 0)
+    if (conectar() != 0)
     {
-        if (conectar() != 0)
-        {
-            perror("Error al conectar con el servidor");
-            return 1;
-        }
+        perror("Error al conectar con el servidor");
+        return 1;
     }
 
     /*mensaje que contiene una letra con el modo de operacion*/
@@ -257,5 +247,6 @@ int get(const char *cola, void **mensaje, uint32_t *tam, bool blocking)
     }
 
     free(msj);
+    close(s);
     return 0;
 }

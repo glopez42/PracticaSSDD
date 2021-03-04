@@ -45,41 +45,38 @@ int conectar()
 
 int createMQ(const char *cola)
 {
-    int nameLength, leido;
-    char *mensaje;
+    int nameLength;
+    char respuesta;
     char operacion[2];
-    struct iovec envio[1];
+    struct iovec envio[2];
 
     /*letra C para crear una cola*/
     operacion[0] = 'C';
     operacion[1] = '\0';
-    nameLength = strlen(cola);
+    nameLength = strlen(cola) + 1;
 
     if (conectar() != 0)
     {
         perror("Error al conectar con el servidor");
         return 1;
     }
+    
 
-    /*mensaje que contiene una letra con el modo de operacion*/
-    /*y el nombre de la cola*/
-    mensaje = malloc(1 + nameLength);
-    strcpy(mensaje, operacion);
-    strcat(mensaje, cola);
-    leido = strlen(mensaje) + 1;
-
-    envio[0].iov_base = mensaje;
-    envio[0].iov_len = leido;
+    envio[0].iov_base = (void *) operacion;
+    envio[0].iov_len = strlen(operacion) + 1;
+    envio[1].iov_base = (void *) cola;
+    envio[1].iov_len = nameLength;
 
     /*mandamos mensaje*/
-    if (writev(s, envio, 1) < 0)
+    if (writev(s, envio, 2) < 0)
     {
         perror("Error al mandar un mensaje desde el cliente");
         close(s);
         return -1;
     }
+    
     /*recibimos respuesta*/
-    if ((read(s, mensaje, TAM)) < 0)
+    if ((read(s, &respuesta, TAM)) < 0)
     {
         perror("Error al recibir un mensaje del servidor");
         close(s);
@@ -88,7 +85,8 @@ int createMQ(const char *cola)
 
     /*TRATAMIENTO DE RESPUESTA*/
 
-    free(mensaje);
+    printf("%c\n", respuesta);
+
     close(s);
     return 0;
 }

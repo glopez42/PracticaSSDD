@@ -17,8 +17,10 @@ int main(int argc, char *argv[])
     int s, s_conec, leido;
     unsigned int tam_dir;
     struct sockaddr_in dir, dir_cliente;
-    struct iovec envio[1];
-    char buf[TAM];
+    struct iovec *envio;
+    struct iovec mensaje[4];
+    char *operacion;
+    char *nombreCola;
     int opcion = 1;
 
     if (argc != 2)
@@ -46,7 +48,7 @@ int main(int argc, char *argv[])
         close(s);
         return 1;
     }
-    
+
     if (listen(s, 5) < 0)
     {
         perror("error en listen");
@@ -57,30 +59,48 @@ int main(int argc, char *argv[])
     while (1)
     {
         tam_dir = sizeof(dir_cliente);
+
         if ((s_conec = accept(s, (struct sockaddr *)&dir_cliente, &tam_dir)) < 0)
         {
             perror("error en accept");
             close(s);
             return 1;
         }
-        while ((leido = read(s_conec, buf, TAM)) > 0)
+        
+        mensaje[0].iov_base = malloc(sizeof(char));
+        mensaje[0].iov_len = 1;
+
+        /*recibimos el paquete*/
+        while ((leido = readv(s_conec, mensaje, 1)) > 0)
         {
-
-
-
-
-
-            envio[0].iov_base = NULL;
-            envio[0].iov_len = 0;
-
-            if (writev(s_conec, envio, leido) < 0)
+            operacion = (char *) mensaje[0].iov_base;
+            switch (*operacion)
             {
-                perror("error en write");
-                close(s);
-                close(s_conec);
-                return 1;
+            case 'C':
+                printf("hola\n");
+                
+                break;
+            
+            default:
+                break;
             }
+
+
+
+
+            // envio[0].iov_base = NULL;
+            // envio[0].iov_len = 0;
+
+            // if (writev(s_conec, envio, leido) < 0)
+            // {
+            //     perror("error en write");
+            //     close(s);
+            //     close(s_conec);
+            //     return 1;
+            // }
+
         }
+        printf("%d\n", leido);
         if (leido < 0)
         {
             perror("error en read");

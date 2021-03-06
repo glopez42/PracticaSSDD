@@ -14,14 +14,15 @@
 
 int main(int argc, char *argv[])
 {
-    int s, s_conec, leido;
+    int s, s_conec;
     unsigned int tam_dir;
     struct sockaddr_in dir, dir_cliente;
-    struct iovec *envio;
-    struct iovec mensaje[4];
-    char *operacion;
+    struct iovec envio[1];
+    char operacion;
     char *nombreCola;
     int opcion = 1;
+
+    operacion = '\0';
 
     if (argc != 2)
     {
@@ -56,59 +57,50 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    nombreCola = malloc(TAM);
+
     while (1)
     {
         tam_dir = sizeof(dir_cliente);
-
+        printf("acá\n");
         if ((s_conec = accept(s, (struct sockaddr *)&dir_cliente, &tam_dir)) < 0)
         {
             perror("error en accept");
             close(s);
             return 1;
         }
-        
-        mensaje[0].iov_base = malloc(sizeof(char));
-        mensaje[0].iov_len = 1;
-
+    
         /*recibimos el paquete*/
-        while ((leido = readv(s_conec, mensaje, 1)) > 0)
+        if (recv(s_conec, &operacion, sizeof(char), MSG_WAITALL) > 0)
         {
-            operacion = (char *) mensaje[0].iov_base;
-            switch (*operacion)
+            recv(s_conec, nombreCola, TAM, MSG_WAITALL);
+            switch (operacion)
             {
             case 'C':
                 printf("hola\n");
-                
+                printf("%s\n", nombreCola);
                 break;
             
             default:
                 break;
             }
 
-
-
-
-            // envio[0].iov_base = NULL;
-            // envio[0].iov_len = 0;
-
-            // if (writev(s_conec, envio, leido) < 0)
-            // {
-            //     perror("error en write");
-            //     close(s);
-            //     close(s_conec);
-            //     return 1;
-            // }
+            operacion='B';
+            envio[0].iov_base = (void *) &operacion;
+            envio[0].iov_len = sizeof(char);
+            writev(s_conec, envio, 1);
+            close(s_conec);
 
         }
-        printf("%d\n", leido);
-        if (leido < 0)
-        {
-            perror("error en read");
-            close(s);
+        else {
+            perror("error en recv");
             close(s_conec);
+            close(s);
             return 1;
         }
-        close(s_conec);
+
+        printf("bien\n");
+        
     }
     close(s);
     return 0;

@@ -45,7 +45,7 @@ int conectar()
 
 int createMQ(const char *cola)
 {
-    int nameLength;
+    int nameLength, code;
     char respuesta;
     char operacion[2];
     struct iovec envio[2];
@@ -60,11 +60,10 @@ int createMQ(const char *cola)
         perror("Error al conectar con el servidor");
         return 1;
     }
-    
 
-    envio[0].iov_base = (void *) operacion;
+    envio[0].iov_base = (void *)operacion;
     envio[0].iov_len = strlen(operacion) + 1;
-    envio[1].iov_base = (void *) cola;
+    envio[1].iov_base = (void *)cola;
     envio[1].iov_len = nameLength;
 
     /*mandamos mensaje*/
@@ -74,9 +73,9 @@ int createMQ(const char *cola)
         close(s);
         return -1;
     }
-    
+
     /*recibimos respuesta*/
-    if ((read(s, &respuesta, TAM)) < 0)
+    if ((recv(s, &respuesta, sizeof(char) + 1, MSG_WAITALL)) < 0)
     {
         perror("Error al recibir un mensaje del servidor");
         close(s);
@@ -84,11 +83,21 @@ int createMQ(const char *cola)
     }
 
     /*TRATAMIENTO DE RESPUESTA*/
-
     printf("%c\n", respuesta);
 
+    switch (respuesta)
+    {
+    case 'B':
+        code = 0;
+        break;
+
+    default:
+        code = -1;
+        break;
+    }
+    
     close(s);
-    return 0;
+    return code;
 }
 
 int destroyMQ(const char *cola)
@@ -138,7 +147,7 @@ int destroyMQ(const char *cola)
     /*TRATAMIENTO DE RESPUESTA*/
 
     free(mensaje);
-    close(s);    
+    close(s);
     return 0;
 }
 
@@ -196,7 +205,7 @@ int put(const char *cola, const void *mensaje, uint32_t tam)
     /*TRATAMIENTO DE RESPUESTA*/
 
     free(mensajeFinal);
-    close(s);    
+    close(s);
     return 0;
 }
 

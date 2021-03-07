@@ -14,7 +14,7 @@
 
 int main(int argc, char *argv[])
 {
-    int s, s_conec;
+    int s, s_conec, nameLength;
     unsigned int tam_dir;
     struct sockaddr_in dir, dir_cliente;
     struct iovec envio[1];
@@ -23,6 +23,7 @@ int main(int argc, char *argv[])
     int opcion = 1;
 
     operacion = '\0';
+    nameLength = 0;
 
     if (argc != 2)
     {
@@ -62,7 +63,6 @@ int main(int argc, char *argv[])
     while (1)
     {
         tam_dir = sizeof(dir_cliente);
-        printf("acá\n");
         if ((s_conec = accept(s, (struct sockaddr *)&dir_cliente, &tam_dir)) < 0)
         {
             perror("error en accept");
@@ -73,12 +73,18 @@ int main(int argc, char *argv[])
         /*recibimos el paquete*/
         if (recv(s_conec, &operacion, sizeof(char), MSG_WAITALL) > 0)
         {
-            recv(s_conec, nombreCola, TAM, MSG_WAITALL);
+            recv(s_conec, &nameLength, sizeof(int), MSG_WAITALL);
+            /*transformamos el entero (network byte order to host byte order)*/
+            nameLength = ntohs(nameLength);
+            /*guardamos espacio para recibir el nombre de la cola*/
+            nombreCola = malloc(nameLength);
+
             switch (operacion)
             {
             case 'C':
-                printf("hola\n");
-                printf("%s\n", nombreCola);
+                printf("%d\n",nameLength);
+                recv(s_conec, nombreCola, nameLength, MSG_WAITALL);
+                printf("%s\n",nombreCola);
                 break;
             
             default:

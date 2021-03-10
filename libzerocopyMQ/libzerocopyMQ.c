@@ -65,8 +65,8 @@ int createMQ(const char *cola)
     envio[0].iov_len = strlen(operacion) + 1;
     envio[1].iov_base = (void *) &nameLength;
     envio[1].iov_len = sizeof(nameLength);
-    envio[2].iov_base = (void *)cola;
-    envio[2].iov_len = nameLength;
+    envio[2].iov_base = (char *)cola;
+    envio[2].iov_len = nameLength * sizeof(char);
     
     /*mandamos mensaje*/
     if (writev(s, envio, 3) < 0)

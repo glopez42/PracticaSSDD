@@ -14,7 +14,7 @@
 
 int main(int argc, char *argv[])
 {
-    int s, s_conec, nameLength;
+    int s, s_conec, nameLength, leido;
     unsigned int tam_dir;
     struct sockaddr_in dir, dir_cliente;
     struct iovec envio[1];
@@ -58,8 +58,6 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    nombreCola = malloc(TAM);
-
     while (1)
     {
         tam_dir = sizeof(dir_cliente);
@@ -77,14 +75,14 @@ int main(int argc, char *argv[])
             /*transformamos el entero (network byte order to host byte order)*/
             nameLength = ntohs(nameLength);
             /*guardamos espacio para recibir el nombre de la cola*/
-            nombreCola = malloc(nameLength);
+            nombreCola = malloc(nameLength * sizeof(char));
 
             switch (operacion)
             {
             case 'C':
-                printf("%d\n",nameLength);
-                recv(s_conec, nombreCola, nameLength, MSG_WAITALL);
-                printf("%s\n",nombreCola);
+                leido = recv(s_conec, nombreCola, nameLength * sizeof(char), MSG_WAITALL);
+                printf("%d %d\n",nameLength, leido);
+                printf("%s\n",&nombreCola[1]);
                 break;
             
             default:
@@ -106,6 +104,7 @@ int main(int argc, char *argv[])
         }
 
         printf("bien\n");
+        free(nombreCola);
         
     }
     close(s);

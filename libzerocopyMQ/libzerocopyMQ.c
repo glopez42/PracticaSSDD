@@ -102,11 +102,10 @@ int createMQ(const char *cola)
 
 int destroyMQ(const char *cola)
 {
-
-    int nameLength, leido;
-    char *mensaje;
+    int nameLength, code;
+    char respuesta;
     char operacion[2];
-    struct iovec envio[1];
+    struct iovec envio[3];
 
     /*letra D para destruir una cola*/
     operacion[0] = 'D';
@@ -119,25 +118,23 @@ int destroyMQ(const char *cola)
         return 1;
     }
 
-    /*mensaje que contiene una letra con el modo de operacion*/
-    /*y el nombre de la cola*/
-    mensaje = malloc(1 + nameLength);
-    strcpy(mensaje, operacion);
-    strcat(mensaje, cola);
-    leido = strlen(mensaje);
-
-    envio[0].iov_base = mensaje;
-    envio[0].iov_len = leido;
-
+    envio[0].iov_base = (void *)operacion;
+    envio[0].iov_len = strlen(operacion) + 1;
+    envio[1].iov_base = (void *) &nameLength;
+    envio[1].iov_len = sizeof(nameLength);
+    envio[2].iov_base = (char *)cola;
+    envio[2].iov_len = nameLength * sizeof(char);
+    
     /*mandamos mensaje*/
-    if (writev(s, envio, 1) < 0)
+    if (writev(s, envio, 3) < 0)
     {
         perror("Error al mandar un mensaje desde el cliente");
         close(s);
         return -1;
     }
+
     /*recibimos respuesta*/
-    if ((read(s, mensaje, TAM)) < 0)
+    if ((recv(s, &respuesta, sizeof(char) + 1, MSG_WAITALL)) < 0)
     {
         perror("Error al recibir un mensaje del servidor");
         close(s);
@@ -145,10 +142,19 @@ int destroyMQ(const char *cola)
     }
 
     /*TRATAMIENTO DE RESPUESTA*/
+    switch (respuesta)
+    {
+    case 'B':
+        code = 0;
+        break;
 
-    free(mensaje);
+    default:
+        code = -1;
+        break;
+    }
+    
     close(s);
-    return 0;
+    return code;
 }
 
 int put(const char *cola, const void *mensaje, uint32_t tam)

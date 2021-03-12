@@ -47,13 +47,8 @@ int createMQ(const char *cola)
 {
     int nameLength, code;
     char respuesta;
-    char operacion[2];
+    char operacion;
     struct iovec envio[3];
-
-    /*letra C para crear una cola*/
-    operacion[0] = 'C';
-    operacion[1] = '\0';
-    nameLength = strlen(cola) + 1;
 
     if (conectar() != 0)
     {
@@ -61,12 +56,16 @@ int createMQ(const char *cola)
         return 1;
     }
 
-    envio[0].iov_base = (void *)operacion;
-    envio[0].iov_len = strlen(operacion) + 1;
-    envio[1].iov_base = (void *) &nameLength;
+    /*letra C para crear una cola*/
+    operacion = 'C';
+    nameLength = strlen(cola) + 1;
+
+    envio[0].iov_base = &operacion;
+    envio[0].iov_len = sizeof(operacion);
+    envio[1].iov_base = &nameLength;
     envio[1].iov_len = sizeof(nameLength);
     envio[2].iov_base = (char *)cola;
-    envio[2].iov_len = nameLength * sizeof(char);
+    envio[2].iov_len = nameLength;
     
     /*mandamos mensaje*/
     if (writev(s, envio, 3) < 0)
@@ -75,6 +74,8 @@ int createMQ(const char *cola)
         close(s);
         return -1;
     }
+
+    printf("\n");
 
     /*recibimos respuesta*/
     if ((recv(s, &respuesta, sizeof(char) + 1, MSG_WAITALL)) < 0)
@@ -85,16 +86,7 @@ int createMQ(const char *cola)
     }
 
     /*TRATAMIENTO DE RESPUESTA*/
-    switch (respuesta)
-    {
-    case 'B':
-        code = 0;
-        break;
-
-    default:
-        code = -1;
-        break;
-    }
+    code = (respuesta == 'B') ? 0 : -1;
     
     close(s);
     return code;
@@ -104,13 +96,8 @@ int destroyMQ(const char *cola)
 {
     int nameLength, code;
     char respuesta;
-    char operacion[2];
+    char operacion;
     struct iovec envio[3];
-
-    /*letra D para destruir una cola*/
-    operacion[0] = 'D';
-    operacion[1] = '\0';
-    nameLength = strlen(cola) + 1;
 
     if (conectar() != 0)
     {
@@ -118,12 +105,16 @@ int destroyMQ(const char *cola)
         return 1;
     }
 
-    envio[0].iov_base = (void *)operacion;
-    envio[0].iov_len = strlen(operacion) + 1;
-    envio[1].iov_base = (void *) &nameLength;
+    /*letra D para destruir una cola*/
+    operacion = 'D';
+    nameLength = strlen(cola) + 1;
+
+    envio[0].iov_base = &operacion;
+    envio[0].iov_len = sizeof(operacion);
+    envio[1].iov_base = &nameLength;
     envio[1].iov_len = sizeof(nameLength);
     envio[2].iov_base = (char *)cola;
-    envio[2].iov_len = nameLength * sizeof(char);
+    envio[2].iov_len = nameLength;
     
     /*mandamos mensaje*/
     if (writev(s, envio, 3) < 0)
@@ -142,16 +133,7 @@ int destroyMQ(const char *cola)
     }
 
     /*TRATAMIENTO DE RESPUESTA*/
-    switch (respuesta)
-    {
-    case 'B':
-        code = 0;
-        break;
-
-    default:
-        code = -1;
-        break;
-    }
+    code = (respuesta == 'B') ? 0 : -1;
     
     close(s);
     return code;
@@ -159,10 +141,15 @@ int destroyMQ(const char *cola)
 
 int put(const char *cola, const void *mensaje, uint32_t tam)
 {
-    int nameLength, tamLength;
-    char *mensajeFinal;
-    char operacion[2], tamanyo[8];
-    struct iovec envio[1];
+    int nameLength, code;
+    char respuesta;
+    char operacion;
+    struct iovec envio[5];
+
+    if (tam == 0)
+    {
+        return 0;
+    }
 
     if (conectar() != 0)
     {
@@ -170,30 +157,23 @@ int put(const char *cola, const void *mensaje, uint32_t tam)
         return 1;
     }
 
-    /*Letra P para poner en una cola*/
-    operacion[0] = 'P';
-    operacion[1] = '\0';
+    /*letra P para poner un mensaje en una cola*/
+    operacion = 'P';
+    nameLength = strlen(cola) + 1;
 
-    nameLength = strlen(cola);
-    /*pasamos tam a texto*/
-    sprintf(tamanyo, "%d", tam);
-    tamLength = strlen(tamanyo);
-
-    /*en el mensaje, primero irá la letra asociada a la operación
-    después el tamaño del mensaje seguido de un guion, el mensaje
-    y finalmente el nombre de la cola*/
-    mensajeFinal = malloc(1 + tamLength + 1 + tam + nameLength);
-    strcpy(mensajeFinal, operacion);
-    strcat(mensajeFinal, tamanyo);
-    strcat(mensajeFinal, "-");
-    strcat(mensajeFinal, mensaje);
-    strcat(mensajeFinal, cola);
-
-    envio[0].iov_base = mensajeFinal;
-    envio[0].iov_len = strlen(mensajeFinal) + 1;
-
+    envio[0].iov_base = &operacion;
+    envio[0].iov_len = sizeof(operacion);
+    envio[1].iov_base = &nameLength;
+    envio[1].iov_len = sizeof(nameLength);
+    envio[2].iov_base = (char *)cola;
+    envio[2].iov_len = nameLength;
+    envio[3].iov_base = &tam;
+    envio[3].iov_len = sizeof(tam);
+    envio[4].iov_base = (char *)mensaje;
+    envio[4].iov_len = tam;
+    
     /*mandamos mensaje*/
-    if (writev(s, envio, 1) < 0)
+    if (writev(s, envio, 5) < 0)
     {
         perror("Error al mandar un mensaje desde el cliente");
         close(s);
@@ -201,7 +181,7 @@ int put(const char *cola, const void *mensaje, uint32_t tam)
     }
 
     /*recibimos respuesta*/
-    if ((read(s, mensajeFinal, TAM)) < 0)
+    if ((recv(s, &respuesta, sizeof(char) + 1, MSG_WAITALL)) < 0)
     {
         perror("Error al recibir un mensaje del servidor");
         close(s);
@@ -209,10 +189,10 @@ int put(const char *cola, const void *mensaje, uint32_t tam)
     }
 
     /*TRATAMIENTO DE RESPUESTA*/
-
-    free(mensajeFinal);
+    code = (respuesta == 'B') ? 0 : -1;
+    
     close(s);
-    return 0;
+    return code;   
 }
 
 int get(const char *cola, void **mensaje, uint32_t *tam, bool blocking)

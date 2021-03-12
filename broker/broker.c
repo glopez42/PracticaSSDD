@@ -22,14 +22,14 @@ void libera_persona(char *c, void *v)
 
 int main(int argc, char *argv[])
 {
-    int s, s_conec, nameLength, error;
+    int s, s_conec, nameLength, messageLength, error;
     unsigned int tam_dir;
     struct sockaddr_in dir, dir_cliente;
     struct diccionario *dic;
     struct cola *cola;
     struct iovec envio[1];
     char operacion;
-    char *nombreCola;
+    char *nombreCola, *mensaje;
     int opcion = 1;
 
     operacion = '\0';
@@ -85,8 +85,6 @@ int main(int argc, char *argv[])
         if (recv(s_conec, &operacion, sizeof(char), MSG_WAITALL) > 0)
         {
             recv(s_conec, &nameLength, sizeof(int), MSG_WAITALL);
-            /*transformamos el entero (network byte order to host byte order)*/
-            nameLength = ntohs(nameLength);
             /*guardamos espacio para recibir el nombre de la cola*/
             nombreCola = malloc(nameLength * sizeof(char));
             printf("%d\n", nameLength);
@@ -96,26 +94,23 @@ int main(int argc, char *argv[])
 
                 recv(s_conec, nombreCola, nameLength, MSG_WAITALL);
                 cola = cola_create();
-                nombreCola = nombreCola + sizeof(char);
                 printf("%s\n", nombreCola);
                 /*Se mete en el diccionario*/
                 if (dic_put(dic, nombreCola, cola) < 0)
                 {
                     /*devuelve el caracter E si hay un error*/
-                    operacion = 'M';
+                    operacion = 'E';
+                    printf("entro\n");
                 }
                 else
                 {
                     operacion = 'B';
                 }
-                nombreCola = nombreCola - sizeof(char);
-                free(nombreCola);
                 break;
 
             case 'D':
 
                 recv(s_conec, nombreCola, nameLength, MSG_WAITALL);
-                nombreCola = nombreCola + sizeof(char);
                 printf("%s\n", nombreCola);
 
                 /*Se mete en el diccionario*/
@@ -142,12 +137,39 @@ int main(int argc, char *argv[])
                     break;
                 }
 
-                operacion = 'B';
-                nombreCola = nombreCola - sizeof(char);
                 free(nombreCola);
+                operacion = 'B';
                 break;
 
             case 'P':
+                /*recibimos el nombre de la cola*/
+                recv(s_conec, nombreCola, nameLength, MSG_WAITALL);
+                printf("%s\n", nombreCola);
+                /*recibimos el tamaño del mensaje*/
+                recv(s_conec, &messageLength, sizeof(int), MSG_WAITALL);
+                /*guardamos espacio para recibir el nombre de la cola*/
+                mensaje = malloc(messageLength);
+                /*recibimos el mensaje*/
+                recv(s_conec, mensaje, messageLength, MSG_WAITALL);
+                printf("%s\n", mensaje);
+
+                cola = dic_get(dic, nombreCola, &error);
+                if (error < 0)
+                {
+                    /*devuelve el caracter E si no existe la cola*/
+                    operacion = 'E';
+                    break;
+                }
+
+                if (cola_push_back(cola, mensaje) < 0)
+                {
+                    /*devuelve el caracter E si hay un error*/
+                    operacion = 'E';
+                    break;
+                }
+                
+                operacion ='B';
+                break;
 
             case 'G':
 
@@ -155,7 +177,8 @@ int main(int argc, char *argv[])
                 break;
             }
 
-            envio[0].iov_base = (void *)&operacion;
+            /*enviamos respuesta*/
+            envio[0].iov_base = &operacion;
             envio[0].iov_len = sizeof(char);
             writev(s_conec, envio, 1);
             close(s_conec);
@@ -168,7 +191,7 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
-    free(nombreCola);
+
     close(s);
     return 0;
 }

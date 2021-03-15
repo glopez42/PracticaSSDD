@@ -47,7 +47,9 @@ int main(int argc, char *argv[]) {
 		            } while (fd == -1);
                             write(fd, mensaje, tam);
                             close(fd);
+                            printf("ERRORRRRRRRRRR\n");
                             free(mensaje);
+                            printf("AH NO\n");
                         }
                         else printf("no hay mensajes\n");
                     }

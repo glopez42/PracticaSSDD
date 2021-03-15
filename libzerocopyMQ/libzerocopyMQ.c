@@ -198,15 +198,9 @@ int put(const char *cola, const void *mensaje, uint32_t tam)
 int get(const char *cola, void **mensaje, uint32_t *tam, bool blocking)
 {
 
-    int nameLength, leido;
-    char *msj;
-    char operacion[2];
-    struct iovec envio[1];
-
-    /*letra G para obtener un mensaje*/
-    operacion[0] = 'D';
-    operacion[1] = '\0';
-    nameLength = strlen(cola);
+    int nameLength;
+    char operacion;
+    struct iovec envio[3];
 
     if (conectar() != 0)
     {
@@ -214,32 +208,51 @@ int get(const char *cola, void **mensaje, uint32_t *tam, bool blocking)
         return 1;
     }
 
-    /*mensaje que contiene una letra con el modo de operacion*/
-    /*y el nombre de la cola*/
-    msj = malloc(1 + nameLength);
-    strcpy(msj, operacion);
-    strcat(msj, cola);
-    leido = strlen(msj) + 1;
+    /*letra G para obtener un mensaje de una cola*/
+    operacion = 'G';
+    nameLength = strlen(cola) + 1;
 
-    envio[0].iov_base = msj;
-    envio[0].iov_len = leido;
+    envio[0].iov_base = &operacion;
+    envio[0].iov_len = sizeof(operacion);
+    envio[1].iov_base = &nameLength;
+    envio[1].iov_len = sizeof(nameLength);
+    envio[2].iov_base = (char *)cola;
+    envio[2].iov_len = nameLength;
 
+     
     /*mandamos mensaje*/
-    if (writev(s, envio, 1) < 0)
+    if (writev(s, envio, 3) < 0)
     {
         perror("Error al mandar un mensaje desde el cliente");
         close(s);
         return -1;
     }
-    /*recibimos respuesta*/
-    if ((read(s, msj, TAM)) < 0)
+
+    /*recibimos el tamaño del mensaje que vamos a recibir*/
+    if ((recv(s, tam, sizeof(int), MSG_WAITALL)) < 0)
     {
         perror("Error al recibir un mensaje del servidor");
         close(s);
         return -1;
     }
 
-    free(msj);
+    /*si no existe la cola o no hay mensajes*/
+    if (*tam == -1)
+    {
+        close(s);
+        return -1;
+    }
+
+    *mensaje = (char *) malloc(*tam + 1);
+
+    /*recibimos el mensaje*/
+    if ((recv(s, *mensaje, *tam + 1, MSG_WAITALL)) < 0)
+    {
+        perror("Error al recibir un mensaje del servidor");
+        close(s);
+        return -1;
+    }
+
     close(s);
-    return 0;
+    return 0;   
 }

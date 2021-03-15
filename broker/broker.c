@@ -12,24 +12,25 @@
 
 #define TAM 1024
 
-void libera_persona(char *c, void *v)
+struct paquete
 {
-    // libera la clave reservada
-    free(c);
-    // libera la estructura cola reservada mediante malloc
-    free(v);
-}
+    int tam;
+    char *mensaje;
+};
+
 
 int main(int argc, char *argv[])
 {
-    int s, s_conec, nameLength, messageLength, error;
+    int s, s_conec, nameLength, error;
     unsigned int tam_dir;
     struct sockaddr_in dir, dir_cliente;
     struct diccionario *dic;
     struct cola *cola;
-    struct iovec envio[1];
+    struct paquete *paquete;
+    struct iovec resultado[1];
+    struct iovec envio[2];
     char operacion;
-    char *nombreCola, *mensaje;
+    char *nombreCola;
     int opcion = 1;
 
     operacion = '\0';
@@ -87,20 +88,17 @@ int main(int argc, char *argv[])
             recv(s_conec, &nameLength, sizeof(int), MSG_WAITALL);
             /*guardamos espacio para recibir el nombre de la cola*/
             nombreCola = malloc(nameLength * sizeof(char));
-            printf("%d\n", nameLength);
             switch (operacion)
             {
             case 'C':
 
                 recv(s_conec, nombreCola, nameLength, MSG_WAITALL);
                 cola = cola_create();
-                printf("%s\n", nombreCola);
                 /*Se mete en el diccionario*/
                 if (dic_put(dic, nombreCola, cola) < 0)
                 {
                     /*devuelve el caracter E si hay un error*/
                     operacion = 'E';
-                    printf("entro\n");
                 }
                 else
                 {
@@ -111,7 +109,6 @@ int main(int argc, char *argv[])
             case 'D':
 
                 recv(s_conec, nombreCola, nameLength, MSG_WAITALL);
-                printf("%s\n", nombreCola);
 
                 /*Se mete en el diccionario*/
                 cola = dic_get(dic, nombreCola, &error); 
@@ -142,16 +139,18 @@ int main(int argc, char *argv[])
                 break;
 
             case 'P':
+
+                /*guardamos espacio para el paquete que se meterá en la cola*/
+                paquete = malloc(sizeof(struct paquete));
                 /*recibimos el nombre de la cola*/
                 recv(s_conec, nombreCola, nameLength, MSG_WAITALL);
-                printf("%s\n", nombreCola);
+
                 /*recibimos el tamaño del mensaje*/
-                recv(s_conec, &messageLength, sizeof(int), MSG_WAITALL);
+                recv(s_conec, &(paquete->tam), sizeof(int), MSG_WAITALL);
                 /*guardamos espacio para recibir el nombre de la cola*/
-                mensaje = malloc(messageLength);
+                paquete->mensaje = malloc(paquete->tam);
                 /*recibimos el mensaje*/
-                recv(s_conec, mensaje, messageLength, MSG_WAITALL);
-                printf("%s\n", mensaje);
+                recv(s_conec, paquete->mensaje, paquete->tam, MSG_WAITALL);
 
                 cola = dic_get(dic, nombreCola, &error);
                 if (error < 0)
@@ -161,7 +160,7 @@ int main(int argc, char *argv[])
                     break;
                 }
 
-                if (cola_push_back(cola, mensaje) < 0)
+                if (cola_push_back(cola, paquete) < 0)
                 {
                     /*devuelve el caracter E si hay un error*/
                     operacion = 'E';
@@ -173,14 +172,57 @@ int main(int argc, char *argv[])
 
             case 'G':
 
+                /*recibimos el nombre de la cola*/
+                recv(s_conec, nombreCola, nameLength, MSG_WAITALL);
+
+                cola = dic_get(dic, nombreCola, &error);
+                if (error < 0)
+                {
+                    /*devuelve -1 si hay un error*/
+                    resultado[0].iov_base = &error;
+                    resultado[0].iov_len = sizeof(int);
+                    writev(s_conec, resultado, 1);
+                    close(s_conec);
+                    /*vuelve al bucle del servidor*/
+                    continue;
+                }
+
+                paquete = cola_pop_front(cola, &error);
+                if (error < 0)
+                {
+                    /*devuelve -1 si hay un error*/
+                    resultado[0].iov_base = &error;
+                    resultado[0].iov_len = sizeof(int);
+                    writev(s_conec, resultado, 1);
+                    close(s_conec);
+                    /*vuelve al bucle del servidor*/
+                    continue;
+                }
+
+                /*hacemos el envío del mensaje*/
+                envio[0].iov_base = &(paquete->tam);
+                envio[0].iov_len = sizeof(int);
+                envio[1].iov_base = paquete->mensaje;
+                envio[1].iov_len = paquete->tam + 1;
+                writev(s_conec, envio, 2);
+                
+                /*liberamos memoria*/
+                free(paquete->mensaje);
+                free(paquete);
+
+                close(s_conec);
+                continue;
+
             default:
+                /*si no es ninguno de los casos anteriores, hay un error*/
+                operacion ='E';
                 break;
             }
 
             /*enviamos respuesta*/
-            envio[0].iov_base = &operacion;
-            envio[0].iov_len = sizeof(char);
-            writev(s_conec, envio, 1);
+            resultado[0].iov_base = &operacion;
+            resultado[0].iov_len = sizeof(char);
+            writev(s_conec, resultado, 1);
             close(s_conec);
         }
         else

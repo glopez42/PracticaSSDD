@@ -236,11 +236,18 @@ int get(const char *cola, void **mensaje, uint32_t *tam, bool blocking)
         return -1;
     }
 
-    /*si no existe la cola o no hay mensajes*/
+    /*si no existe la cola*/
     if (*tam == -1)
     {
         close(s);
         return -1;
+    }
+
+    /*si la cola está vacía, no es un error*/
+    if (*tam == 0)
+    {
+        close(s);
+        return 0;
     }
 
     *mensaje = (char *) malloc(*tam + 1);

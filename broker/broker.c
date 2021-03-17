@@ -190,7 +190,8 @@ int main(int argc, char *argv[])
                 paquete = cola_pop_front(cola, &error);
                 if (error < 0)
                 {
-                    /*devuelve -1 si hay un error*/
+                    /*devuelve 0 si la cola está vacía*/
+                    error = 0;
                     resultado[0].iov_base = &error;
                     resultado[0].iov_len = sizeof(int);
                     writev(s_conec, resultado, 1);

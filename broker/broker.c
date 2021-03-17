@@ -10,21 +10,59 @@
 #include "diccionario.h"
 #include "cola.h"
 
-#define TAM 1024
-
 struct paquete
 {
     int tam;
     char *mensaje;
 };
 
+struct diccionario *dic;
+struct diccionario *esperando;
+
+/*función auxiliar que comprueba si para una cola*/
+/*hay clientes esperando a un mensaje*/
+void comprobarBloqueados(char *nombreCola)
+{
+    struct cola *cola;
+    struct iovec envio[2];
+    struct paquete *paquete;
+    int *socket, error, p;
+    printf("%s\n", nombreCola);
+    cola = dic_get(esperando, nombreCola, &error);
+    printf("%d\n", error);
+    if ( (p = cola_length(cola)) <= 0)
+    {
+        /* si no hay ninguno, se termina */
+        return;
+    }
+
+    printf("%d\n", p);
+    /*se extrae el socket del primer cliente bloqueado*/
+    socket = cola_pop_front(cola, &error);
+
+    /*en caso contrario se manda por el socket y se cierra la conexión*/
+
+    cola = dic_get(dic, nombreCola, &error);
+    paquete = cola_pop_front(cola, &error);
+
+    envio[0].iov_base = &(paquete->tam);
+    envio[0].iov_len = sizeof(int);
+    envio[1].iov_base = paquete->mensaje;
+    envio[1].iov_len = paquete->tam + 1;
+    writev(*socket, envio, 2);
+
+    /*liberamos memoria*/
+    free(paquete->mensaje);
+    free(paquete);
+
+    close(*socket);
+}
 
 int main(int argc, char *argv[])
 {
     int s, s_conec, nameLength, error;
     unsigned int tam_dir;
     struct sockaddr_in dir, dir_cliente;
-    struct diccionario *dic;
     struct cola *cola;
     struct paquete *paquete;
     struct iovec resultado[1];
@@ -71,6 +109,7 @@ int main(int argc, char *argv[])
 
     /*creamos diccionario de colas*/
     dic = dic_create();
+    esperando = dic_create();
 
     while (1)
     {
@@ -90,15 +129,21 @@ int main(int argc, char *argv[])
             nombreCola = malloc(nameLength * sizeof(char));
             switch (operacion)
             {
+            /*createMQ*/
             case 'C':
 
                 recv(s_conec, nombreCola, nameLength, MSG_WAITALL);
                 cola = cola_create();
-                /*Se mete en el diccionario*/
+                /*Se mete en los diccionarios*/
                 if (dic_put(dic, nombreCola, cola) < 0)
                 {
                     /*devuelve el caracter E si hay un error*/
                     operacion = 'E';
+
+                    /*guardamos también el nombre en el diccionario esperando*/
+                    /*para posibles llamadas bloqueantes. Se crea una nueva cola*/
+                    cola = cola_create();
+                    dic_put(esperando, nombreCola, cola);
                 }
                 else
                 {
@@ -106,12 +151,13 @@ int main(int argc, char *argv[])
                 }
                 break;
 
+            /*destroyMQ*/
             case 'D':
 
                 recv(s_conec, nombreCola, nameLength, MSG_WAITALL);
 
                 /*Se mete en el diccionario*/
-                cola = dic_get(dic, nombreCola, &error); 
+                cola = dic_get(dic, nombreCola, &error);
                 if (error < 0)
                 {
                     /*devuelve el caracter E si hay un error*/
@@ -138,6 +184,7 @@ int main(int argc, char *argv[])
                 operacion = 'B';
                 break;
 
+            /*put*/
             case 'P':
 
                 /*guardamos espacio para el paquete que se meterá en la cola*/
@@ -166,10 +213,14 @@ int main(int argc, char *argv[])
                     operacion = 'E';
                     break;
                 }
-                
-                operacion ='B';
+
+                operacion = 'B';
+
+                /*comprobamos si hay algún cliente esperando en esta cola*/
+                comprobarBloqueados(nombreCola);
                 break;
 
+            /*get No Bloqueante*/
             case 'G':
 
                 /*recibimos el nombre de la cola*/
@@ -206,7 +257,48 @@ int main(int argc, char *argv[])
                 envio[1].iov_base = paquete->mensaje;
                 envio[1].iov_len = paquete->tam + 1;
                 writev(s_conec, envio, 2);
-                
+
+                /*liberamos memoria*/
+                free(paquete->mensaje);
+                free(paquete);
+
+                close(s_conec);
+                continue;
+
+            /*get Bloqueante*/
+            case 'B':
+                /*recibimos el nombre de la cola*/
+                recv(s_conec, nombreCola, nameLength, MSG_WAITALL);
+
+                cola = dic_get(dic, nombreCola, &error);
+                if (error < 0)
+                {
+                    /*devuelve -1 si hay un error*/
+                    resultado[0].iov_base = &error;
+                    resultado[0].iov_len = sizeof(int);
+                    writev(s_conec, resultado, 1);
+                    close(s_conec);
+                    /*vuelve al bucle del servidor*/
+                    continue;
+                }
+
+                paquete = cola_pop_front(cola, &error);
+                if (error < 0)
+                {
+                    /*si la cola está vacía se guarda el socket en la cola de espera*/
+                    cola = dic_get(esperando, nombreCola, &error);
+                    cola_push_back(cola, &s_conec);
+                    /*vuelve al bucle del servidor*/
+                    continue;
+                }
+
+                /*si no está vacía hacemos el envío del mensaje*/
+                envio[0].iov_base = &(paquete->tam);
+                envio[0].iov_len = sizeof(int);
+                envio[1].iov_base = paquete->mensaje;
+                envio[1].iov_len = paquete->tam + 1;
+                writev(s_conec, envio, 2);
+
                 /*liberamos memoria*/
                 free(paquete->mensaje);
                 free(paquete);
@@ -216,7 +308,7 @@ int main(int argc, char *argv[])
 
             default:
                 /*si no es ninguno de los casos anteriores, hay un error*/
-                operacion ='E';
+                operacion = 'E';
                 break;
             }
 

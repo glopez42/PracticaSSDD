@@ -208,8 +208,9 @@ int get(const char *cola, void **mensaje, uint32_t *tam, bool blocking)
         return 1;
     }
 
-    /*letra G para obtener un mensaje de una cola*/
-    operacion = 'G';
+    /*letra G para obtener un mensaje de una cola
+     o letra B para una lectura bloqueante*/
+    operacion = (blocking)? 'B':'G';
     nameLength = strlen(cola) + 1;
 
     envio[0].iov_base = &operacion;

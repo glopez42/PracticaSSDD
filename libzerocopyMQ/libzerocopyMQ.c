@@ -10,8 +10,6 @@
 #include "zerocopyMQ.h"
 #include "comun.h"
 
-#define TAM 1024
-
 int s, leido;
 struct sockaddr_in dir;
 struct hostent *host_info;

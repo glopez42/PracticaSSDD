@@ -10,6 +10,38 @@ struct persona {
     char * nombre;
 };
 
+/*función auxiliar que comprueba si para una cola*/
+/*hay clientes esperando a un mensaje*/
+void comprobarBloqueados(const char *nombreCola)
+{
+    struct cola *cola;
+    struct iovec envio[2];
+    struct paquete *paquete;
+    int *s, error, p;
+    cola = dic_get(esperando, nombreCola, &error);
+    if (error != -1 && ((p = cola_length(cola)) > 0))
+    {
+        /*se extrae el socket del primer cliente bloqueado*/
+        s = cola_pop_front(cola, &error);
+        /*en caso contrario se manda por el socket y se cierra la conexión*/
+
+        cola = dic_get(dic, nombreCola, &error);
+        paquete = cola_pop_front(cola, &error);
+        envio[0].iov_base = &(paquete->tam);
+        envio[0].iov_len = sizeof(int);
+        envio[1].iov_base = paquete->mensaje;
+        envio[1].iov_len = paquete->tam + 1;
+        writev(*s, envio, 2);
+
+        /*liberamos memoria*/
+        free(paquete->mensaje);
+        free(paquete);
+
+        close(*s);
+        free(s);
+    }
+}
+
 
 void inserta_persona(struct cola *c) {
     int edad,dni;
@@ -51,3 +83,5 @@ int main(){
     printf("%ld\n", strlen(hola));
 
 }
+
+

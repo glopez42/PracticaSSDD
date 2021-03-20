@@ -13,7 +13,6 @@
 int s, leido;
 struct sockaddr_in dir;
 struct hostent *host_info;
-int conexion = 0;
 
 /*funcion que se realiza solo una vez por cliente 
 * la primera vez que intenta acceder al servidor */
@@ -36,8 +35,7 @@ int conectar()
         close(s);
         return 1;
     }
-    /*ponemos conexion a 1 para que no intente volver a conectarse*/
-    conexion = 1;
+
     return 0;
 }
 
@@ -72,8 +70,6 @@ int createMQ(const char *cola)
         close(s);
         return -1;
     }
-
-    printf("\n");
 
     /*recibimos respuesta*/
     if ((recv(s, &respuesta, sizeof(char) + 1, MSG_WAITALL)) < 0)

@@ -21,7 +21,7 @@ struct diccionario *esperando;
 
 int main(int argc, char *argv[])
 {
-    int s, *sck, s_conec, nameLength, error, *socketCliente, length, i;
+    int s, *sck, s_conec, nameLength, error, *socketCliente, length, i, done;
     unsigned int tam_dir;
     struct sockaddr_in dir, dir_cliente;
     struct cola *cola;
@@ -140,10 +140,9 @@ int main(int argc, char *argv[])
                 cola = dic_get(esperando, nombreCola, &error);
                 if (error != -1 && (length = cola_length(cola)) > 0)
                 {
-                    
+
                     for (i = 0; i < length; i++)
                     {
-                        printf("%d %d\n", i, length);
                         /*cogemos el socket*/
                         sck = cola_pop_front(cola, &error);
 
@@ -204,22 +203,34 @@ int main(int argc, char *argv[])
                 if (error != -1 && (cola_length(cola) > 0))
                 {
                     /*si es asi se extrae el socket del primer cliente bloqueado*/
-                    sck = cola_pop_front(cola, &error);
-                    cola = dic_get(dic, nombreCola, &error);
-                    paquete = cola_pop_front(cola, &error);
-                    /*se manda el mensaje al que está esperando*/
-                    envio[0].iov_base = &(paquete->tam);
-                    envio[0].iov_len = sizeof(int);
-                    envio[1].iov_base = paquete->mensaje;
-                    envio[1].iov_len = paquete->tam + 1;
-                    writev(*sck, envio, 2);
+                    done = 0;
+                    while (!done)
+                    {          
+                        sck = cola_pop_front(cola, &error);
+                        cola = dic_get(dic, nombreCola, &error);
+                        paquete = cola_pop_front(cola, &error);
 
-                    /*liberamos memoria*/
-                    free(paquete->mensaje);
-                    free(paquete);
+                        /*se manda el mensaje al que está esperando*/
+                        envio[0].iov_base = &(paquete->tam);
+                        envio[0].iov_len = sizeof(int);
+                        envio[1].iov_base = paquete->mensaje;
+                        envio[1].iov_len = paquete->tam + 1;     
+                        if (writev(*sck, envio, 2) <= 0)
+                        {
+                            /*si hay un error se prueba otra vez*/
+                            close(*sck);
+                            free(sck);
+                            continue;
+                        }
+                        /*si se consigue mandar, se termina*/
+                        done = 1;
+                        /*liberamos memoria*/
+                        free(paquete->mensaje);
+                        free(paquete);
 
-                    close(*sck);
-                    free(sck);
+                        close(*sck);
+                        free(sck);
+                    }
                 }
 
                 break;
@@ -298,14 +309,12 @@ int main(int argc, char *argv[])
                     {
                         cola = cola_create();
                         cola_push_back(cola, socketCliente);
-                        printf("uno %d\n", cola_length(cola));
                         dic_put(esperando, nombreCola, cola);
                     }
                     else
                     {
                         /*si no, se mete directamente*/
                         cola_push_back(cola, socketCliente);
-                        printf("dos %d\n", cola_length(cola));
                     }
 
                     /*vuelve al bucle del servidor*/

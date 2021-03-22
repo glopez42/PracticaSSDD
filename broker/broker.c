@@ -202,28 +202,26 @@ int main(int argc, char *argv[])
                 cola = dic_get(esperando, nombreCola, &error);
                 if (error != -1 && (cola_length(cola) > 0))
                 {
-                    /*si es asi se extrae el socket del primer cliente bloqueado*/
                     done = 0;
+                    /*si es asi se extrae el socket del primer cliente bloqueado*/
                     while (!done)
-                    {          
+                    {
                         sck = cola_pop_front(cola, &error);
                         cola = dic_get(dic, nombreCola, &error);
                         paquete = cola_pop_front(cola, &error);
-
                         /*se manda el mensaje al que está esperando*/
                         envio[0].iov_base = &(paquete->tam);
                         envio[0].iov_len = sizeof(int);
                         envio[1].iov_base = paquete->mensaje;
-                        envio[1].iov_len = paquete->tam + 1;     
+                        envio[1].iov_len = paquete->tam + 1;
                         if (writev(*sck, envio, 2) <= 0)
                         {
-                            /*si hay un error se prueba otra vez*/
                             close(*sck);
                             free(sck);
                             continue;
                         }
-                        /*si se consigue mandar, se termina*/
                         done = 1;
+
                         /*liberamos memoria*/
                         free(paquete->mensaje);
                         free(paquete);

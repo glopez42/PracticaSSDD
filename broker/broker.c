@@ -143,7 +143,6 @@ int main(int argc, char *argv[])
                     
                     for (i = 0; i < length; i++)
                     {
-                        printf("%d %d\n", i, length);
                         /*cogemos el socket*/
                         sck = cola_pop_front(cola, &error);
 
@@ -298,14 +297,12 @@ int main(int argc, char *argv[])
                     {
                         cola = cola_create();
                         cola_push_back(cola, socketCliente);
-                        printf("uno %d\n", cola_length(cola));
                         dic_put(esperando, nombreCola, cola);
                     }
                     else
                     {
                         /*si no, se mete directamente*/
                         cola_push_back(cola, socketCliente);
-                        printf("dos %d\n", cola_length(cola));
                     }
 
                     /*vuelve al bucle del servidor*/

@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
     struct paquete *paquete;
     struct iovec resultado[1];
     struct iovec envio[2];
-    char operacion;
+    char operacion, buff[128];
     char *nombreCola;
     int opcion = 1;
 
@@ -207,9 +207,16 @@ int main(int argc, char *argv[])
                     while (!done)
                     {
                         sck = cola_pop_front(cola, &error);
+                        /*de este modo se mira si el cliente que estaba esperando no se ha caido*/
+                        if (recv(*sck, buff, 128, MSG_PEEK | MSG_DONTWAIT) == 0)
+                        {
+                            /*si se ha caido, vamos al siguiente cliente*/
+                            free(sck);
+                            continue;
+                        }
+                        /*se manda el mensaje al que está esperando*/
                         cola = dic_get(dic, nombreCola, &error);
                         paquete = cola_pop_front(cola, &error);
-                        /*se manda el mensaje al que está esperando*/
                         envio[0].iov_base = &(paquete->tam);
                         envio[0].iov_len = sizeof(int);
                         envio[1].iov_base = paquete->mensaje;
@@ -221,7 +228,6 @@ int main(int argc, char *argv[])
                             continue;
                         }
                         done = 1;
-
                         /*liberamos memoria*/
                         free(paquete->mensaje);
                         free(paquete);
